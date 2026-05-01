@@ -1,0 +1,2 @@
+UPDATE public.payments SET gateway = 'PAGOUAI_API_KEY' WHERE gateway = 'unknown' AND user_id = 'c1434f10-7168-463f-8367-288acdabe689';
+UPDATE public.webhook_logs SET gateway = 'PAGOUAI_API_KEY' WHERE gateway = 'unknown' AND user_id = 'c1434f10-7168-463f-8367-288acdabe689';

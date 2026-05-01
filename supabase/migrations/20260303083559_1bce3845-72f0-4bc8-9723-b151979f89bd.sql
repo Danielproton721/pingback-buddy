@@ -1,0 +1,1 @@
+ALTER TABLE public.gateway_configs ADD COLUMN display_name text;

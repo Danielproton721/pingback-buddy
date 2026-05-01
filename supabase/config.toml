@@ -1,0 +1,10 @@
+project_id = "sjkrdekwdyjfxmcioggb"
+
+[functions.webhook-payment]
+verify_jwt = false
+
+[functions.get-vapid-key]
+verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false
