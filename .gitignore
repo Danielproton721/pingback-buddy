@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .env
+
+# Pasta de download dos icones Lordicon (os usados ja estao em src/assets/lottie)
+animated icons black/
