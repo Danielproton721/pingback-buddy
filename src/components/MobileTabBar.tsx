@@ -15,8 +15,8 @@ export function MobileTabBar() {
   const { setSelectedGateway } = useGateway();
 
   return (
-    <nav className="glass-nav fixed bottom-0 left-0 right-0 z-40 pb-safe">
-      <div className="mx-auto flex max-w-md items-stretch justify-around px-2 pt-1.5">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-safe">
+      <div className="glass-pill pointer-events-auto mx-auto mb-1 flex max-w-md items-center justify-around gap-0.5 rounded-full px-2 py-2">
         {items.map((item) => {
           const active = location.pathname === item.path;
           return (
@@ -26,18 +26,12 @@ export function MobileTabBar() {
               onClick={() => {
                 if (item.path === "/") setSelectedGateway(null);
               }}
-              className={`tap flex flex-1 flex-col items-center gap-1 py-1 text-[10px] font-medium ${
+              className={`tap flex flex-1 flex-col items-center gap-0.5 rounded-full py-1 text-[10px] font-medium transition-colors ${
                 active ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <span
-                className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${
-                  active ? "bg-primary/15" : ""
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-              </span>
-              {item.label}
+              <item.icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.4 : 2} />
+              <span>{item.label}</span>
             </Link>
           );
         })}
