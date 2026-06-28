@@ -85,6 +85,19 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Fundo vivo: dá cor para o vidro desfocar atrás. Fixo e atrás de tudo. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(60% 50% at 12% 0%, hsl(185 70% 50% / 0.22), transparent 70%),
+      radial-gradient(55% 45% at 90% 10%, hsl(265 75% 58% / 0.18), transparent 70%),
+      radial-gradient(75% 60% at 50% 110%, hsl(190 80% 50% / 0.16), transparent 70%);
   }
 }
 
@@ -92,9 +105,46 @@
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+  /* ---------- Liquid glass (sua receita, adaptada ao tema) ---------- */
+  .glass-card,
+  .glass {
+    position: relative;
+    background: hsl(0 0% 100% / 0.05);
+    backdrop-filter: blur(16px) saturate(1.7) brightness(1.08);
+    -webkit-backdrop-filter: blur(16px) saturate(1.7) brightness(1.08);
+    border: none;
+    box-shadow:
+      inset 0 0 0 1px hsl(0 0% 100% / 0.12),
+      inset 1.5px 1.5px 0 hsl(0 0% 100% / 0.28),
+      inset 0 0 14px hsl(0 0% 100% / 0.07),
+      0 8px 32px hsl(225 45% 2% / 0.45);
   }
+  /* Vidro mais denso para superfícies grandes/elevadas */
+  .glass-strong {
+    background: hsl(0 0% 100% / 0.08);
+    backdrop-filter: blur(28px) saturate(1.9) brightness(1.1);
+    -webkit-backdrop-filter: blur(28px) saturate(1.9) brightness(1.1);
+    box-shadow:
+      inset 0 0 0 1px hsl(0 0% 100% / 0.14),
+      inset 1.5px 1.5px 0 hsl(0 0% 100% / 0.30),
+      inset 0 0 18px hsl(0 0% 100% / 0.08),
+      0 12px 40px hsl(225 45% 2% / 0.5);
+  }
+  /* Barras de navegação (header e tab bar) */
+  .glass-nav {
+    background: hsl(225 25% 8% / 0.6);
+    backdrop-filter: blur(24px) saturate(1.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.16),
+      inset 0 0 0 1px hsl(0 0% 100% / 0.05);
+  }
+  /* Áreas seguras do iOS (notch / home indicator) */
+  .pt-safe { padding-top: max(env(safe-area-inset-top), 0.5rem); }
+  .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.5rem); }
+  /* Resposta tátil ao toque (feel de app nativo) */
+  .tap { transition: transform 0.15s ease, background-color 0.15s ease; }
+  .tap:active { transform: scale(0.95); }
   .glow-primary {
     box-shadow: 0 0 20px hsl(185 70% 50% / 0.15), 0 0 40px hsl(185 70% 50% / 0.05);
   }
