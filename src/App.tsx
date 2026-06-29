@@ -6,10 +6,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { GatewayProvider } from "@/contexts/GatewayContext";
 import Dashboard from "@/pages/Dashboard";
-import WebhookLogs from "@/pages/WebhookLogs";
+import Logs from "@/pages/Logs";
 import Notifications from "@/pages/Notifications";
 import Settings from "@/pages/Settings";
-import Debug from "@/pages/Debug";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -25,10 +24,9 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route element={<GatewayProvider><AppLayout /></GatewayProvider>}>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/logs" element={<WebhookLogs />} />
+            <Route path="/logs" element={<Logs />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/debug" element={<Debug />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

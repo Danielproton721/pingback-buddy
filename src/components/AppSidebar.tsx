@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, Webhook, Bell, Settings, LogOut, Bug, Layers } from "lucide-react";
+import { LayoutDashboard, Webhook, Bell, Settings, LogOut, Layers } from "lucide-react";
 import { getGatewayIcon } from "@/components/GatewayIconPicker";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,6 @@ const navItems = [
   { icon: Webhook, label: "Webhook Logs", path: "/logs" },
   { icon: Bell, label: "Notificações", path: "/notifications" },
   { icon: Settings, label: "Configurações", path: "/settings" },
-  { icon: Bug, label: "Debug", path: "/debug" },
 ];
 
 export function AppSidebar() {

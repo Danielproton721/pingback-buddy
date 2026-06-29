@@ -6,7 +6,6 @@ import homeIcon from "@/assets/lottie/home.json";
 import clockIcon from "@/assets/lottie/clock.json";
 import bellIcon from "@/assets/lottie/bell.json";
 import cogIcon from "@/assets/lottie/cog.json";
-import spinnerIcon from "@/assets/lottie/spinner.json";
 
 // Cores aproximadas do tema (primary cyan / muted-foreground)
 const ACTIVE_COLOR = "#2cc9d9";
@@ -17,7 +16,6 @@ const items = [
   { icon: clockIcon, label: "Logs", path: "/logs" },
   { icon: bellIcon, label: "Alertas", path: "/notifications" },
   { icon: cogIcon, label: "Ajustes", path: "/settings" },
-  { icon: spinnerIcon, label: "Debug", path: "/debug" },
 ];
 
 interface TabItemProps {
