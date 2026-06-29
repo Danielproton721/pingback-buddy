@@ -8,8 +8,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Handler minimo de fetch (passthrough) — exigido para o app ser instalavel como PWA
+self.addEventListener('fetch', () => {});
+
 self.addEventListener('push', (event) => {
-  let data = { title: 'PayHook', body: 'Nova notificação', icon: '/favicon.ico' };
+  let data = { title: 'PayHook', body: 'Nova notificação', icon: '/icon-192.png' };
 
   if (event.data) {
     try {
@@ -21,8 +24,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: data.icon || '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: data.icon || '/icon-192.png',
+    badge: '/icon-192.png',
     vibrate: data.vibrate ? [200, 100, 200] : undefined,
     data: {
       url: data.url || '/',
