@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 
 type ValuePos = "start" | "end";
 
-// Monta o template (com os placeholders ocultos) conforme a posição do valor.
 const buildMessage = (pos: ValuePos) =>
   pos === "start"
     ? "R$ {amount} — {customer} • {product}"
@@ -22,9 +21,28 @@ const previewText = (pos: ValuePos) =>
 const DEFAULT_PAID_TITLE = "Pagamento confirmado";
 const DEFAULT_PENDING_TITLE = "Novo pagamento";
 
+function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+        enabled ? "bg-primary" : "bg-secondary"
+      }`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+          enabled ? "translate-x-6" : "translate-x-1"
+        }`}
+      />
+    </button>
+  );
+}
+
 export function NotificationTemplates() {
   const [paidTitle, setPaidTitle] = useState(DEFAULT_PAID_TITLE);
   const [pendingTitle, setPendingTitle] = useState(DEFAULT_PENDING_TITLE);
+  const [paidEnabled, setPaidEnabled] = useState(true);
+  const [pendingEnabled, setPendingEnabled] = useState(true);
   const [valuePos, setValuePos] = useState<ValuePos>("end");
   const [userId, setUserId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -42,7 +60,7 @@ export function NotificationTemplates() {
 
     const { data } = await supabase
       .from("notification_settings")
-      .select("paid_title, paid_message, pending_title, pending_message")
+      .select("paid_title, paid_message, pending_title, pending_message, paid_enabled, pending_enabled")
       .eq("user_id", user.id)
       .single();
 
@@ -50,6 +68,8 @@ export function NotificationTemplates() {
       const d = data as any;
       setPaidTitle(d.paid_title ?? DEFAULT_PAID_TITLE);
       setPendingTitle(d.pending_title ?? DEFAULT_PENDING_TITLE);
+      setPaidEnabled(d.paid_enabled ?? true);
+      setPendingEnabled(d.pending_enabled ?? true);
       setValuePos(detectPos(d.paid_message));
     }
   };
@@ -65,6 +85,8 @@ export function NotificationTemplates() {
         pending_title: pendingTitle,
         paid_message: message,
         pending_message: message,
+        paid_enabled: paidEnabled,
+        pending_enabled: pendingEnabled,
       } as any,
       { onConflict: "user_id" }
     );
@@ -107,36 +129,58 @@ export function NotificationTemplates() {
         </div>
       </div>
 
-      {/* Títulos */}
-      <div className="mt-5 space-y-4">
-        <div className="space-y-1.5">
+      {/* Pago */}
+      <div className="mt-5 space-y-2">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
-            <p className="text-sm font-medium">Título — Pagamento confirmado</p>
+            <p className="text-sm font-medium">Pagamento confirmado</p>
           </div>
-          <input
-            value={paidTitle}
-            onChange={(e) => {
-              setPaidTitle(e.target.value);
+          <Toggle
+            enabled={paidEnabled}
+            onToggle={() => {
+              setPaidEnabled((v) => !v);
               mark();
             }}
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
-        <div className="space-y-1.5">
+        <input
+          value={paidTitle}
+          disabled={!paidEnabled}
+          onChange={(e) => {
+            setPaidTitle(e.target.value);
+            mark();
+          }}
+          placeholder="Título da notificação"
+          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+        />
+      </div>
+
+      {/* Pendente */}
+      <div className="mt-4 space-y-2">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
-            <p className="text-sm font-medium">Título — Pagamento pendente</p>
+            <p className="text-sm font-medium">Pagamento pendente</p>
           </div>
-          <input
-            value={pendingTitle}
-            onChange={(e) => {
-              setPendingTitle(e.target.value);
+          <Toggle
+            enabled={pendingEnabled}
+            onToggle={() => {
+              setPendingEnabled((v) => !v);
               mark();
             }}
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
+        <input
+          value={pendingTitle}
+          disabled={!pendingEnabled}
+          onChange={(e) => {
+            setPendingTitle(e.target.value);
+            mark();
+          }}
+          placeholder="Título da notificação"
+          className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring disabled:opacity-40"
+        />
       </div>
 
       <button

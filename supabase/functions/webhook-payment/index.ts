@@ -277,7 +277,7 @@ serve(async (req) => {
     // Notification - fetch user's custom templates
     const { data: userSettings } = await supabase
       .from("notification_settings")
-      .select("paid_title, paid_message, pending_title, pending_message")
+      .select("paid_title, paid_message, pending_title, pending_message, paid_enabled, pending_enabled")
       .eq("user_id", userId)
       .single();
 
@@ -303,6 +303,13 @@ serve(async (req) => {
       ? formatTemplate(templateMsg)
       : `${customerName || "Cliente"} - R$ ${Number(amount).toFixed(2)}${productName ? ` - ${productName}` : ""} via ${paymentMethod || "N/A"}`;
 
+    // Liga/desliga a notificação por status (Pago / Pendente). Outros status sempre notificam.
+    const notifyEnabled =
+      status === "paid" ? us?.paid_enabled !== false
+      : status === "pending" ? us?.pending_enabled !== false
+      : true;
+
+    if (notifyEnabled) {
     await supabase.from("notifications").insert({
       user_id: userId,
       title: notifTitle,
@@ -359,6 +366,7 @@ serve(async (req) => {
         }
       }
     } catch { /* Push notification errors shouldn't fail the webhook */ }
+    }
 
     return new Response(JSON.stringify({ success: true, processing_time_ms: processingTimeMs }), {
       status: 200,
