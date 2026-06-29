@@ -157,7 +157,7 @@ export default function Settings() {
         ) : (
           <div className="divide-y divide-border">
             {configs.map((c) => (
-              <div key={c.id} className="flex items-center gap-4 px-5 py-3">
+              <div key={c.id} className="flex items-start gap-3 px-4 py-3">
                 <GatewayIconPicker
                   value={c.icon || "credit-card"}
                   onChange={(icon) => handleIconChange(c.id, icon)}
@@ -239,8 +239,11 @@ export default function Settings() {
                 </div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <button className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
+                    <button
+                      aria-label="Excluir gateway"
+                      className="tap mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20"
+                    >
+                      <Trash2 className="h-5 w-5" />
                     </button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
