@@ -44,6 +44,7 @@ export interface GatewayConfig {
   name: string;
   display_name: string | null;
   icon: string | null;
+  color: string | null;
   secret_key: string;
   is_active: boolean | null;
   created_at: string;
@@ -56,6 +57,10 @@ export async function updateGatewayDisplayName(id: string, displayName: string) 
 
 export async function updateGatewayIcon(id: string, icon: string) {
   return supabase.from('gateway_configs').update({ icon }).eq('id', id);
+}
+
+export async function updateGatewayColor(id: string, color: string) {
+  return supabase.from('gateway_configs').update({ color } as any).eq('id', id);
 }
 
 export async function fetchPayments(filters?: {

@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { fetchPaymentStatsByGateway, deleteGatewayConfig } from "@/lib/supabase-helpers";
+import { fetchPaymentStatsByGateway, deleteGatewayConfig, updateGatewayColor } from "@/lib/supabase-helpers";
 import { useGateway } from "@/contexts/GatewayContext";
 import { ArrowRight, Plus, Wallet, Trash2 } from "lucide-react";
 import { getGatewayIcon } from "@/components/GatewayIconPicker";
 import { useToast } from "@/hooks/use-toast";
 
-const CARD_GRADIENTS = [
-  "from-violet-600 via-violet-700 to-indigo-800",
-  "from-cyan-500 via-sky-600 to-blue-700",
-  "from-emerald-500 via-teal-600 to-teal-800",
-  "from-rose-500 via-pink-600 to-fuchsia-700",
-  "from-amber-500 via-orange-600 to-red-600",
-  "from-slate-600 via-slate-700 to-slate-900",
+const PALETTE: { key: string; grad: string }[] = [
+  { key: "violet", grad: "from-violet-600 via-violet-700 to-indigo-800" },
+  { key: "blue", grad: "from-cyan-500 via-sky-600 to-blue-700" },
+  { key: "emerald", grad: "from-emerald-500 via-teal-600 to-teal-800" },
+  { key: "rose", grad: "from-rose-500 via-pink-600 to-fuchsia-700" },
+  { key: "amber", grad: "from-amber-500 via-orange-600 to-red-600" },
+  { key: "slate", grad: "from-slate-600 via-slate-700 to-slate-900" },
+  { key: "fuchsia", grad: "from-fuchsia-600 via-purple-700 to-violet-900" },
+  { key: "lime", grad: "from-lime-500 via-green-600 to-emerald-700" },
+  { key: "red", grad: "from-red-500 via-rose-600 to-pink-700" },
+  { key: "indigo", grad: "from-indigo-500 via-blue-700 to-cyan-700" },
 ];
-const gradientFor = (name: string) => {
-  const hash = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  return CARD_GRADIENTS[hash % CARD_GRADIENTS.length];
+
+const hashOf = (name: string) => name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+const keyFor = (name: string, color?: string | null) => {
+  if (color && PALETTE.some((p) => p.key === color)) return color;
+  return PALETTE[hashOf(name) % PALETTE.length].key;
 };
+const gradOf = (name: string, color?: string | null) =>
+  PALETTE.find((p) => p.key === keyFor(name, color))!.grad;
+
 const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 const CARD_H = 184;
@@ -36,6 +45,7 @@ export function GatewayOverview() {
   const [dragName, setDragName] = useState<string | null>(null);
   const [dragX, setDragX] = useState(0);
   const [leaving, setLeaving] = useState(false);
+  const [colorOverride, setColorOverride] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const gest = useRef({ startX: 0, startY: 0, moved: false, longFired: false, timer: 0 });
@@ -50,7 +60,6 @@ export function GatewayOverview() {
   const names = Array.from(new Set([...gateways.map((x) => x.name), ...Object.keys(statsByGateway)]));
   const namesKey = names.join("|");
 
-  // Mantém a ordem sincronizada com os gateways disponíveis (novos vão pro fim)
   useEffect(() => {
     setOrder((prev) => {
       const kept = prev.filter((n) => names.includes(n));
@@ -67,6 +76,7 @@ export function GatewayOverview() {
       displayName: config?.display_name || name,
       icon: config?.icon || "credit-card",
       configId: config?.id as string | undefined,
+      color: colorOverride[name] ?? ((config?.color as string | null | undefined) || null),
       stats: statsByGateway[name] || EMPTY_STATS,
     };
   };
@@ -80,6 +90,15 @@ export function GatewayOverview() {
       await refreshGateways();
     }
     toast({ title: "Gateway deletado" });
+  };
+
+  const handleColor = async (name: string, key: string) => {
+    setColorOverride((prev) => ({ ...prev, [name]: key }));
+    const gw = getGw(name);
+    if (gw.configId) {
+      await updateGatewayColor(gw.configId, key);
+      refreshGateways();
+    }
   };
 
   // ---------- gestos: tap / swipe / long-press ----------
@@ -119,7 +138,6 @@ export function GatewayOverview() {
       return;
     }
     if (gest.current.moved && isFront && Math.abs(dragX) > SWIPE_THRESHOLD) {
-      // arrastou o da frente: manda pro fundo da pilha
       setLeaving(true);
       setDragX(dragX > 0 ? 700 : -700);
       window.setTimeout(() => {
@@ -128,10 +146,9 @@ export function GatewayOverview() {
         setLeaving(false);
       }, 220);
     } else if (!gest.current.moved) {
-      // toque simples: abre o gateway
       setSelectedGateway(name);
     } else {
-      setDragX(0); // não passou do limite: volta
+      setDragX(0);
     }
   };
 
@@ -199,6 +216,8 @@ export function GatewayOverview() {
     );
   }
 
+  const activeGw = active ? getGw(active) : null;
+
   return (
     <div className="mx-auto w-full max-w-lg">
       <div className="select-none pb-1">
@@ -218,7 +237,7 @@ export function GatewayOverview() {
                 setDragName(null);
                 setDragX(0);
               }}
-              className={`relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradientFor(name)}`}
+              className={`relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradOf(name, gw.color)}`}
               style={{
                 height: CARD_H,
                 marginTop: i === 0 ? 0 : -OVERLAP,
@@ -249,19 +268,40 @@ export function GatewayOverview() {
         Adicionar gateway
       </Link>
 
-      {/* Segurar: fundo desfocado + cartão em destaque + Deletar */}
-      {active && (
+      {/* Segurar: fundo desfocado + cartão em destaque + cores + Deletar */}
+      {active && activeGw && (
         <div
           className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-black/50 p-6 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => setActive(null)}
         >
           <div
-            className={`relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br text-white shadow-2xl ring-1 ring-white/20 animate-in zoom-in-95 duration-200 ${gradientFor(active)}`}
+            className={`relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br text-white shadow-2xl ring-1 ring-white/20 animate-in zoom-in-95 duration-200 ${gradOf(active, activeGw.color)}`}
             style={{ height: CARD_H }}
             onClick={(e) => e.stopPropagation()}
           >
-            {cardInner(getGw(active))}
+            {cardInner(activeGw)}
           </div>
+
+          {/* Paleta de cores */}
+          <div
+            className="flex max-w-sm flex-wrap items-center justify-center gap-2.5 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {PALETTE.map((p) => {
+              const selected = keyFor(active, activeGw.color) === p.key;
+              return (
+                <button
+                  key={p.key}
+                  onClick={() => handleColor(active, p.key)}
+                  aria-label={`Cor ${p.key}`}
+                  className={`tap h-8 w-8 rounded-full bg-gradient-to-br ${p.grad} ${
+                    selected ? "ring-2 ring-white ring-offset-2 ring-offset-transparent" : "ring-1 ring-white/25"
+                  }`}
+                />
+              );
+            })}
+          </div>
+
           <button
             onClick={() => handleDelete(active)}
             className="tap flex items-center gap-2 rounded-xl bg-destructive px-7 py-3 text-sm font-semibold text-destructive-foreground shadow-lg animate-in zoom-in-95 duration-200"
