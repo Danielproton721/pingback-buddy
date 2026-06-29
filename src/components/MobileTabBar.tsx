@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Player } from "@lordicon/react";
 import { useGateway } from "@/contexts/GatewayContext";
 import homeIcon from "@/assets/lottie/home.json";
@@ -36,17 +37,24 @@ function TabItem({ icon, label, path, active, onSelect }: TabItemProps) {
         onSelect();
         playerRef.current?.playFromBeginning();
       }}
-      className={`tap flex flex-1 flex-col items-center gap-0.5 rounded-full py-1 text-[10px] font-medium transition-colors ${
-        active ? "text-primary" : "text-muted-foreground"
-      }`}
+      className="tap relative flex flex-1 flex-col items-center justify-center rounded-full py-1.5"
     >
-      <Player
-        ref={playerRef}
-        icon={icon}
-        size={26}
-        colorize={active ? ACTIVE_COLOR : INACTIVE_COLOR}
-      />
-      <span>{label}</span>
+      {active && (
+        <motion.span
+          layoutId="tab-pill"
+          aria-hidden="true"
+          className="absolute inset-0 rounded-full bg-white/[0.14] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.28)] ring-1 ring-inset ring-white/15"
+          transition={{ type: "spring", duration: 0.4, bounce: 0.18 }}
+        />
+      )}
+      <span
+        className={`relative z-10 flex flex-col items-center gap-0.5 text-[10px] font-medium transition-colors ${
+          active ? "text-primary" : "text-muted-foreground"
+        }`}
+      >
+        <Player ref={playerRef} icon={icon} size={26} colorize={active ? ACTIVE_COLOR : INACTIVE_COLOR} />
+        {label}
+      </span>
     </Link>
   );
 }
