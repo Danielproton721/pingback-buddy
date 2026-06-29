@@ -3,39 +3,39 @@ import { MessageSquare, Save } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface Templates {
-  paid_title: string;
-  paid_message: string;
-  pending_title: string;
-  pending_message: string;
-}
+type ValuePos = "start" | "end";
 
-const DEFAULTS: Templates = {
-  paid_title: "Pagamento confirmado",
-  paid_message: "{customer} - R$ {amount} - {product} via {method}",
-  pending_title: "Novo pagamento",
-  pending_message: "{customer} - R$ {amount} - {product} via {method}",
-};
+// Monta o template (com os placeholders ocultos) conforme a posição do valor.
+const buildMessage = (pos: ValuePos) =>
+  pos === "start"
+    ? "R$ {amount} — {customer} • {product}"
+    : "{customer} • {product} — R$ {amount}";
 
-const VARIABLES = [
-  { tag: "{customer}", desc: "Nome do cliente" },
-  { tag: "{amount}", desc: "Valor (R$)" },
-  { tag: "{product}", desc: "Nome do produto" },
-  { tag: "{method}", desc: "Método de pagamento" },
-];
+const detectPos = (msg?: string | null): ValuePos =>
+  msg && msg.trim().startsWith("R$ {amount}") ? "start" : "end";
+
+const previewText = (pos: ValuePos) =>
+  pos === "start"
+    ? "R$ 49,90 — João Silva • Curso de Marketing"
+    : "João Silva • Curso de Marketing — R$ 49,90";
+
+const DEFAULT_PAID_TITLE = "Pagamento confirmado";
+const DEFAULT_PENDING_TITLE = "Novo pagamento";
 
 export function NotificationTemplates() {
-  const [templates, setTemplates] = useState<Templates>(DEFAULTS);
+  const [paidTitle, setPaidTitle] = useState(DEFAULT_PAID_TITLE);
+  const [pendingTitle, setPendingTitle] = useState(DEFAULT_PENDING_TITLE);
+  const [valuePos, setValuePos] = useState<ValuePos>("end");
   const [userId, setUserId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadTemplates();
+    load();
   }, []);
 
-  const loadTemplates = async () => {
+  const load = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     setUserId(user.id);
@@ -48,124 +48,105 @@ export function NotificationTemplates() {
 
     if (data) {
       const d = data as any;
-      setTemplates({
-        paid_title: d.paid_title ?? DEFAULTS.paid_title,
-        paid_message: d.paid_message ?? DEFAULTS.paid_message,
-        pending_title: d.pending_title ?? DEFAULTS.pending_title,
-        pending_message: d.pending_message ?? DEFAULTS.pending_message,
-      });
+      setPaidTitle(d.paid_title ?? DEFAULT_PAID_TITLE);
+      setPendingTitle(d.pending_title ?? DEFAULT_PENDING_TITLE);
+      setValuePos(detectPos(d.paid_message));
     }
-  };
-
-  const handleChange = (key: keyof Templates, value: string) => {
-    setTemplates((prev) => ({ ...prev, [key]: value }));
-    setDirty(true);
   };
 
   const handleSave = async () => {
     if (!userId) return;
     setSaving(true);
-    await supabase
-      .from("notification_settings")
-      .upsert({
+    const message = buildMessage(valuePos);
+    await supabase.from("notification_settings").upsert(
+      {
         user_id: userId,
-        paid_title: templates.paid_title,
-        paid_message: templates.paid_message,
-        pending_title: templates.pending_title,
-        pending_message: templates.pending_message,
-      } as any, { onConflict: "user_id" });
+        paid_title: paidTitle,
+        pending_title: pendingTitle,
+        paid_message: message,
+        pending_message: message,
+      } as any,
+      { onConflict: "user_id" }
+    );
     setDirty(false);
     setSaving(false);
-    toast({ title: "Templates salvos!" });
+    toast({ title: "Notificações salvas!" });
   };
 
-  const handleReset = () => {
-    setTemplates(DEFAULTS);
-    setDirty(true);
-  };
+  const mark = () => setDirty(true);
 
   return (
     <div className="glass-card rounded-xl p-5">
-      <div className="flex items-center gap-3 mb-4">
+      <div className="mb-4 flex items-center gap-3">
         <MessageSquare className="h-5 w-5 text-primary" />
-        <h2 className="text-base font-semibold">Templates de Notificação</h2>
+        <h2 className="text-base font-semibold">Texto das Notificações</h2>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-4">
-        Personalize o texto das notificações para cada status de pagamento. Use as variáveis abaixo:
-      </p>
-
-      <div className="flex flex-wrap gap-2 mb-4">
-        {VARIABLES.map((v) => (
-          <span
-            key={v.tag}
-            className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-xs font-mono"
-            title={v.desc}
-          >
-            {v.tag}
-            <span className="text-muted-foreground font-sans">– {v.desc}</span>
-          </span>
-        ))}
+      {/* Posição do valor */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Onde mostrar o valor</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(["start", "end"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => {
+                setValuePos(p);
+                mark();
+              }}
+              className={`tap rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                valuePos === p ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground"
+              }`}
+            >
+              {p === "start" ? "No início" : "No final"}
+            </button>
+          ))}
+        </div>
+        <div className="rounded-lg bg-secondary/50 p-3">
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Prévia</p>
+          <p className="text-sm">{previewText(valuePos)}</p>
+        </div>
       </div>
 
-      <div className="space-y-5">
-        {/* Paid template */}
-        <div className="space-y-2">
+      {/* Títulos */}
+      <div className="mt-5 space-y-4">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-            <p className="text-sm font-medium">Pagamento Confirmado (Pago)</p>
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+            <p className="text-sm font-medium">Título — Pagamento confirmado</p>
           </div>
           <input
-            value={templates.paid_title}
-            onChange={(e) => handleChange("paid_title", e.target.value)}
-            placeholder="Título da notificação"
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-          />
-          <input
-            value={templates.paid_message}
-            onChange={(e) => handleChange("paid_message", e.target.value)}
-            placeholder="Mensagem da notificação"
+            value={paidTitle}
+            onChange={(e) => {
+              setPaidTitle(e.target.value);
+              mark();
+            }}
             className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
-
-        {/* Pending template */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2 rounded-full bg-amber-500 dark:bg-amber-400" />
-            <p className="text-sm font-medium">Pagamento Pendente</p>
+            <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+            <p className="text-sm font-medium">Título — Pagamento pendente</p>
           </div>
           <input
-            value={templates.pending_title}
-            onChange={(e) => handleChange("pending_title", e.target.value)}
-            placeholder="Título da notificação"
-            className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-          />
-          <input
-            value={templates.pending_message}
-            onChange={(e) => handleChange("pending_message", e.target.value)}
-            placeholder="Mensagem da notificação"
+            value={pendingTitle}
+            onChange={(e) => {
+              setPendingTitle(e.target.value);
+              mark();
+            }}
             className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
-        <button
-          onClick={handleSave}
-          disabled={!dirty || saving}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          {saving ? "Salvando..." : "Salvar Templates"}
-        </button>
-        <button
-          onClick={handleReset}
-          className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary"
-        >
-          Restaurar Padrão
-        </button>
-      </div>
+      <button
+        onClick={handleSave}
+        disabled={!dirty || saving}
+        className="tap mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+      >
+        <Save className="h-4 w-4" />
+        {saving ? "Salvando..." : "Salvar"}
+      </button>
     </div>
   );
 }
