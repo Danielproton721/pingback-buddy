@@ -105,45 +105,40 @@
   .font-mono {
     font-family: 'JetBrains Mono', monospace;
   }
-  /* ---------- Liquid glass (sua receita, adaptada ao tema) ---------- */
+  /* ---------- Liquid glass (otimizado: sem backdrop-filter nos cards que rolam) ---------- */
+  /* Cards de conteúdo: fundo fosco translúcido + brilho de borda. SEM blur = scroll fluido. */
   .glass-card,
   .glass {
     position: relative;
-    background: hsl(0 0% 100% / 0.05);
-    backdrop-filter: blur(16px) saturate(1.7) brightness(1.08);
-    -webkit-backdrop-filter: blur(16px) saturate(1.7) brightness(1.08);
+    background: hsl(225 24% 11% / 0.78);
     border: none;
     box-shadow:
-      inset 0 0 0 1px hsl(0 0% 100% / 0.12),
-      inset 1.5px 1.5px 0 hsl(0 0% 100% / 0.28),
-      inset 0 0 14px hsl(0 0% 100% / 0.07),
-      0 8px 32px hsl(225 45% 2% / 0.45);
+      inset 0 0 0 1px hsl(0 0% 100% / 0.10),
+      inset 1.5px 1.5px 0 hsl(0 0% 100% / 0.16),
+      0 8px 24px hsl(225 45% 2% / 0.4);
   }
   /* Vidro mais denso para superfícies grandes/elevadas */
   .glass-strong {
-    background: hsl(0 0% 100% / 0.08);
-    backdrop-filter: blur(28px) saturate(1.9) brightness(1.1);
-    -webkit-backdrop-filter: blur(28px) saturate(1.9) brightness(1.1);
+    background: hsl(225 24% 13% / 0.85);
     box-shadow:
-      inset 0 0 0 1px hsl(0 0% 100% / 0.14),
-      inset 1.5px 1.5px 0 hsl(0 0% 100% / 0.30),
-      inset 0 0 18px hsl(0 0% 100% / 0.08),
-      0 12px 40px hsl(225 45% 2% / 0.5);
+      inset 0 0 0 1px hsl(0 0% 100% / 0.12),
+      inset 1.5px 1.5px 0 hsl(0 0% 100% / 0.18),
+      0 12px 32px hsl(225 45% 2% / 0.5);
   }
-  /* Barras de navegação (header e tab bar) */
+  /* Barras fixas (header e tab bar): blur só aqui — poucos elementos, não rolam */
   .glass-nav {
-    background: hsl(225 25% 8% / 0.6);
-    backdrop-filter: blur(24px) saturate(1.8);
-    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    background: hsl(225 25% 8% / 0.72);
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
     box-shadow:
       inset 0 1px 0 hsl(0 0% 100% / 0.16),
       inset 0 0 0 1px hsl(0 0% 100% / 0.05);
   }
-  /* Pílula flutuante (tab bar estilo iOS/Samsung): brilho em volta + elevação */
+  /* Pílula flutuante (tab bar estilo iOS/Samsung) */
   .glass-pill {
-    background: hsl(225 25% 10% / 0.72);
-    backdrop-filter: blur(28px) saturate(1.9);
-    -webkit-backdrop-filter: blur(28px) saturate(1.9);
+    background: hsl(225 25% 10% / 0.82);
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
     box-shadow:
       inset 0 0 0 1px hsl(0 0% 100% / 0.10),
       inset 0 1.5px 0 hsl(0 0% 100% / 0.22),
