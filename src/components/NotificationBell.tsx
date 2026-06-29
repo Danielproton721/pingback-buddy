@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { Bell, Check, Volume2, VolumeX } from "lucide-react";
+import { Bell, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { markNotificationRead, markAllNotificationsRead } from "@/lib/supabase-helpers";
 import type { Notification } from "@/lib/supabase-helpers";
@@ -63,7 +64,7 @@ export function NotificationBell() {
         setNotifications((prev) => [newNotif, ...prev].slice(0, 20));
         if (soundEnabled) playSound();
         if (Notification.permission === "granted") {
-          new Notification(newNotif.title, { body: newNotif.message || "", icon: "/favicon.ico" });
+          new Notification(newNotif.title, { body: newNotif.message || "", icon: "/icon-192.png" });
         }
         if ("vibrate" in navigator) navigator.vibrate([200, 100, 200]);
       })
@@ -92,57 +93,71 @@ export function NotificationBell() {
 
   return (
     <div ref={ref} className="relative">
-      <button
+      <motion.button
         onClick={() => setOpen(!open)}
+        whileTap={{ scale: 0.86 }}
         className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
       >
-        <Bell className="h-5 w-5" />
+        <motion.span
+          className="block"
+          animate={open ? { rotate: [0, -14, 12, -7, 0] } : { rotate: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Bell className="h-5 w-5" />
+        </motion.span>
         {unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
             {unreadCount}
           </span>
         )}
-      </button>
+      </motion.button>
 
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl animate-slide-in">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h3 className="text-sm font-semibold">Notificações</h3>
-            <div className="flex gap-2">
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.78, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.85, y: -8 }}
+            transition={{ type: "spring", duration: 0.34, bounce: 0.24 }}
+            style={{ transformOrigin: "top right" }}
+            className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-80 overflow-hidden rounded-xl border border-border bg-card shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h3 className="text-sm font-semibold">Notificações</h3>
               {unreadCount > 0 && (
                 <button onClick={handleMarkAllRead} className="text-xs text-primary hover:underline">
                   Marcar todas como lidas
                 </button>
               )}
             </div>
-          </div>
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma notificação</div>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={`flex items-start gap-3 border-b border-border/50 px-4 py-3 transition-colors ${!n.read ? "bg-primary/5" : ""}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{n.title}</p>
-                    {n.message && <p className="text-xs text-muted-foreground truncate">{n.message}</p>}
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
-                    </p>
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma notificação</div>
+              ) : (
+                notifications.map((n) => (
+                  <div
+                    key={n.id}
+                    className={`flex items-start gap-3 border-b border-border/50 px-4 py-3 transition-colors ${!n.read ? "bg-primary/5" : ""}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{n.title}</p>
+                      {n.message && <p className="truncate text-xs text-muted-foreground">{n.message}</p>}
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(n.created_at), { addSuffix: true, locale: ptBR })}
+                      </p>
+                    </div>
+                    {!n.read && (
+                      <button onClick={() => handleMarkRead(n.id)} className="mt-1 rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                        <Check className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
-                  {!n.read && (
-                    <button onClick={() => handleMarkRead(n.id)} className="mt-1 rounded p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
-                      <Check className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

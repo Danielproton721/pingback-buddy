@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { fetchPaymentStatsByGateway, deleteGatewayConfig, updateGatewayColor } from "@/lib/supabase-helpers";
+import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import {
+  fetchPaymentStatsByGateway,
+  deleteGatewayConfig,
+  updateGatewayColor,
+  createGatewayConfig,
+} from "@/lib/supabase-helpers";
+import { supabase } from "@/integrations/supabase/client";
 import { useGateway } from "@/contexts/GatewayContext";
-import { ArrowRight, Plus, Wallet, Trash2 } from "lucide-react";
+import { ArrowRight, Plus, Wallet, Trash2, X } from "lucide-react";
 import { getGatewayIcon } from "@/components/GatewayIconPicker";
 import { useToast } from "@/hooks/use-toast";
 
@@ -32,6 +38,7 @@ const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigi
 const CARD_H = 184;
 const OVERLAP = 120;
 const SWIPE_THRESHOLD = 90;
+const SPRING = { type: "spring", duration: 0.45, bounce: 0.2 } as const;
 
 type Stats = { paid: number; pending: number; failed: number; total: number; count: number };
 const EMPTY_STATS: Stats = { paid: 0, pending: 0, failed: 0, total: 0, count: 0 };
@@ -41,14 +48,14 @@ export function GatewayOverview() {
   const [statsByGateway, setStatsByGateway] = useState<Record<string, Stats>>({});
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<string[]>([]);
-  const [active, setActive] = useState<string | null>(null); // long-press menu
-  const [dragName, setDragName] = useState<string | null>(null);
-  const [dragX, setDragX] = useState(0);
-  const [leaving, setLeaving] = useState(false);
+  const [active, setActive] = useState<string | null>(null);
   const [colorOverride, setColorOverride] = useState<Record<string, string>>({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addSecret, setAddSecret] = useState("");
   const { toast } = useToast();
 
-  const gest = useRef({ startX: 0, startY: 0, moved: false, longFired: false, timer: 0 });
+  const longRef = useRef({ fired: false, timer: 0 });
 
   useEffect(() => {
     fetchPaymentStatsByGateway().then((s) => {
@@ -101,54 +108,44 @@ export function GatewayOverview() {
     }
   };
 
-  // ---------- gestos: tap / swipe / long-press ----------
-  const onDown = (e: React.PointerEvent, name: string) => {
-    gest.current.startX = e.clientX;
-    gest.current.startY = e.clientY;
-    gest.current.moved = false;
-    gest.current.longFired = false;
-    clearTimeout(gest.current.timer);
-    gest.current.timer = window.setTimeout(() => {
-      gest.current.longFired = true;
-      setDragName(null);
-      setDragX(0);
+  const handleAdd = async () => {
+    const n = addName.trim();
+    if (!n || !addSecret.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await createGatewayConfig({ name: n, secret_key: addSecret.trim(), user_id: user.id });
+    setAddName("");
+    setAddSecret("");
+    setShowAdd(false);
+    await refreshGateways();
+    toast({ title: "Gateway adicionado", description: `${n} foi configurado.` });
+  };
+
+  // ---------- gestos ----------
+  const startLong = (name: string) => {
+    longRef.current.fired = false;
+    clearTimeout(longRef.current.timer);
+    longRef.current.timer = window.setTimeout(() => {
+      longRef.current.fired = true;
       setActive(name);
     }, 450);
-    setDragName(name);
   };
+  const cancelLong = () => clearTimeout(longRef.current.timer);
 
-  const onMove = (e: React.PointerEvent, isFront: boolean) => {
-    if (dragName === null) return;
-    const dx = e.clientX - gest.current.startX;
-    const dy = e.clientY - gest.current.startY;
-    if (!gest.current.moved && Math.hypot(dx, dy) > 8) {
-      gest.current.moved = true;
-      clearTimeout(gest.current.timer);
-    }
-    if (gest.current.moved && isFront && Math.abs(dx) > Math.abs(dy)) {
-      setDragX(dx);
-    }
-  };
-
-  const onUp = (name: string, isFront: boolean) => {
-    clearTimeout(gest.current.timer);
-    setDragName(null);
-    if (gest.current.longFired) {
-      setDragX(0);
+  const handleTap = (name: string) => {
+    cancelLong();
+    if (longRef.current.fired) {
+      longRef.current.fired = false;
       return;
     }
-    if (gest.current.moved && isFront && Math.abs(dragX) > SWIPE_THRESHOLD) {
-      setLeaving(true);
-      setDragX(dragX > 0 ? 700 : -700);
-      window.setTimeout(() => {
-        setOrder((prev) => [name, ...prev.filter((n) => n !== name)]);
-        setDragX(0);
-        setLeaving(false);
-      }, 220);
-    } else if (!gest.current.moved) {
-      setSelectedGateway(name);
-    } else {
-      setDragX(0);
+    setSelectedGateway(name);
+  };
+
+  const handleDragEnd = (name: string, info: PanInfo) => {
+    cancelLong();
+    if (longRef.current.fired) return;
+    if (Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
+      setOrder((prev) => [name, ...prev.filter((n) => n !== name)]);
     }
   };
 
@@ -199,118 +196,185 @@ export function GatewayOverview() {
     );
   }
 
-  if (order.length === 0) {
-    return (
-      <Link
-        to="/settings"
-        className="tap mx-auto flex w-full max-w-lg flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-10 text-center"
-      >
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-          <Wallet className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-medium">Sua carteira está vazia</p>
-          <p className="mt-1 text-xs text-muted-foreground">Toque para adicionar seu primeiro gateway</p>
-        </div>
-      </Link>
-    );
-  }
-
   const activeGw = active ? getGw(active) : null;
 
   return (
     <div className="mx-auto w-full max-w-lg">
-      <div className="select-none pb-1">
-        {order.map((name, i) => {
-          const gw = getGw(name);
-          const isFront = i === order.length - 1;
-          const isDrag = dragName === name && isFront;
-          const hidden = active === name;
-          return (
-            <button
-              key={name}
-              onPointerDown={(e) => onDown(e, name)}
-              onPointerMove={(e) => onMove(e, isFront)}
-              onPointerUp={() => onUp(name, isFront)}
-              onPointerCancel={() => {
-                clearTimeout(gest.current.timer);
-                setDragName(null);
-                setDragX(0);
-              }}
-              className={`relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradOf(name, gw.color)}`}
-              style={{
-                height: CARD_H,
-                marginTop: i === 0 ? 0 : -OVERLAP,
-                zIndex: i + 1,
-                transform: isFront && dragX ? `translateX(${dragX}px) rotate(${dragX * 0.02}deg)` : undefined,
-                transition: isDrag && !leaving ? "none" : "transform 0.25s ease, opacity 0.2s ease",
-                opacity: hidden ? 0 : isFront && leaving ? 0 : 1,
-                touchAction: "pan-y",
-              }}
-            >
-              {cardInner(gw)}
-            </button>
-          );
-        })}
-      </div>
-
-      {order.length > 1 && (
-        <p className="mt-2 text-center text-[11px] text-muted-foreground">
-          Arraste para o lado para trocar • Segure para opções
-        </p>
-      )}
-
-      <Link
-        to="/settings"
-        className="tap mt-3 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground"
-      >
-        <Plus className="h-4 w-4" />
-        Adicionar gateway
-      </Link>
-
-      {/* Segurar: fundo desfocado + cartão em destaque + cores + Deletar */}
-      {active && activeGw && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-black/50 p-6 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={() => setActive(null)}
+      {order.length === 0 ? (
+        <button
+          onClick={() => setShowAdd(true)}
+          className="tap flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-10 text-center"
         >
-          <div
-            className={`relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br text-white shadow-2xl ring-1 ring-white/20 animate-in zoom-in-95 duration-200 ${gradOf(active, activeGw.color)}`}
-            style={{ height: CARD_H }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {cardInner(activeGw)}
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+            <Wallet className="h-6 w-6 text-primary" />
           </div>
-
-          {/* Paleta de cores */}
-          <div
-            className="flex max-w-sm flex-wrap items-center justify-center gap-2.5 animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {PALETTE.map((p) => {
-              const selected = keyFor(active, activeGw.color) === p.key;
+          <div>
+            <p className="text-sm font-medium">Sua carteira está vazia</p>
+            <p className="mt-1 text-xs text-muted-foreground">Toque para adicionar seu primeiro gateway</p>
+          </div>
+        </button>
+      ) : (
+        <>
+          <div className="select-none pb-1">
+            {order.map((name, i) => {
+              const gw = getGw(name);
+              const isFront = i === order.length - 1;
               return (
-                <button
-                  key={p.key}
-                  onClick={() => handleColor(active, p.key)}
-                  aria-label={`Cor ${p.key}`}
-                  className={`tap h-8 w-8 rounded-full bg-gradient-to-br ${p.grad} ${
-                    selected ? "ring-2 ring-white ring-offset-2 ring-offset-transparent" : "ring-1 ring-white/25"
-                  }`}
-                />
+                <motion.button
+                  key={name}
+                  layout
+                  transition={SPRING}
+                  drag={isFront ? "x" : false}
+                  dragSnapToOrigin
+                  dragElastic={0.5}
+                  onPointerDown={() => startLong(name)}
+                  onDragStart={cancelLong}
+                  onDragEnd={(_e, info) => handleDragEnd(name, info)}
+                  onTap={() => handleTap(name)}
+                  className={`relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradOf(name, gw.color)}`}
+                  style={{
+                    height: CARD_H,
+                    marginTop: i === 0 ? 0 : -OVERLAP,
+                    zIndex: i + 1,
+                    opacity: active === name ? 0 : 1,
+                    touchAction: "pan-y",
+                  }}
+                >
+                  {cardInner(gw)}
+                </motion.button>
               );
             })}
           </div>
 
+          {order.length > 1 && (
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              Arraste para o lado para trocar • Segure para opções
+            </p>
+          )}
+
           <button
-            onClick={() => handleDelete(active)}
-            className="tap flex items-center gap-2 rounded-xl bg-destructive px-7 py-3 text-sm font-semibold text-destructive-foreground shadow-lg animate-in zoom-in-95 duration-200"
+            onClick={() => setShowAdd(true)}
+            className="tap mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground"
           >
-            <Trash2 className="h-4 w-4" />
-            Deletar
+            <Plus className="h-4 w-4" />
+            Adicionar gateway
           </button>
-        </div>
+        </>
       )}
+
+      {/* Segurar: fundo desfocado + cartão + cores + Deletar */}
+      <AnimatePresence>
+        {active && activeGw && (
+          <motion.div
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-black/50 p-6 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setActive(null)}
+          >
+            <motion.div
+              className={`relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br text-white shadow-2xl ring-1 ring-white/20 ${gradOf(active, activeGw.color)}`}
+              style={{ height: CARD_H }}
+              initial={{ scale: 0.82, opacity: 0, y: 14 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={SPRING}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {cardInner(activeGw)}
+            </motion.div>
+
+            <motion.div
+              className="flex max-w-sm flex-wrap items-center justify-center gap-2.5"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ ...SPRING, delay: 0.05 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {PALETTE.map((p) => {
+                const selected = keyFor(active, activeGw.color) === p.key;
+                return (
+                  <button
+                    key={p.key}
+                    onClick={() => handleColor(active, p.key)}
+                    aria-label={`Cor ${p.key}`}
+                    className={`tap h-8 w-8 rounded-full bg-gradient-to-br ${p.grad} ${
+                      selected ? "ring-2 ring-white ring-offset-2 ring-offset-transparent" : "ring-1 ring-white/25"
+                    }`}
+                  />
+                );
+              })}
+            </motion.div>
+
+            <motion.button
+              onClick={() => handleDelete(active)}
+              className="tap flex items-center gap-2 rounded-xl bg-destructive px-7 py-3 text-sm font-semibold text-destructive-foreground shadow-lg"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ ...SPRING, delay: 0.08 }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Deletar
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal: adicionar gateway */}
+      <AnimatePresence>
+        {showAdd && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setShowAdd(false)}
+          >
+            <motion.div
+              className="glass-strong w-full max-w-sm rounded-2xl p-5"
+              initial={{ scale: 0.9, opacity: 0, y: 14 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={SPRING}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold">Adicionar gateway</h3>
+                <button onClick={() => setShowAdd(false)} className="tap rounded-lg p-1 text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <input
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder="Nome do gateway (ex: Stripe)"
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  type="password"
+                  value={addSecret}
+                  onChange={(e) => setAddSecret(e.target.value)}
+                  placeholder="Secret key"
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                />
+                <button
+                  onClick={handleAdd}
+                  disabled={!addName.trim() || !addSecret.trim()}
+                  className="tap flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
