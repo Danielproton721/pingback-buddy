@@ -1,10 +1,30 @@
 import { useEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useOutlet } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { Webhook, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppSidebar } from "./AppSidebar";
 import { MobileTabBar } from "./MobileTabBar";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+// Transição entre telas com spring suave (estilo iOS)
+function AnimatedOutlet() {
+  const location = useLocation();
+  const element = useOutlet();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, y: 10, scale: 0.99 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -6, scale: 0.99 }}
+        transition={{ type: "spring", duration: 0.35, bounce: 0.12 }}
+      >
+        {element}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
 
 export function AppLayout() {
   const [loading, setLoading] = useState(true);
@@ -58,7 +78,7 @@ export function AppLayout() {
         </header>
         <main className="px-4 pb-28 pt-4">
           <div className="mx-auto max-w-2xl">
-            <Outlet />
+            <AnimatedOutlet />
           </div>
         </main>
         <MobileTabBar />
@@ -71,7 +91,7 @@ export function AppLayout() {
       <AppSidebar />
       <main className="pl-64">
         <div className="mx-auto max-w-6xl p-6">
-          <Outlet />
+          <AnimatedOutlet />
         </div>
       </main>
     </div>
