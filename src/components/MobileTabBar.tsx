@@ -56,21 +56,35 @@ export function MobileTabBar() {
   const { setSelectedGateway } = useGateway();
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-safe">
-      <div className="glass-pill pointer-events-auto mx-auto mb-1 flex max-w-md items-center justify-around gap-0.5 rounded-full px-2 py-2">
-        {items.map((item) => (
-          <TabItem
-            key={item.path}
-            icon={item.icon}
-            label={item.label}
-            path={item.path}
-            active={location.pathname === item.path}
-            onSelect={() => {
-              if (item.path === "/") setSelectedGateway(null);
-            }}
-          />
-        ))}
-      </div>
-    </nav>
+    <>
+      {/* Filtro SVG de distorção (liquid glass) */}
+      <svg width="0" height="0" aria-hidden="true" className="absolute">
+        <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.009 0.009" numOctaves="2" seed="5" result="turbulence" />
+          <feGaussianBlur in="turbulence" stdDeviation="3" result="softMap" />
+          <feDisplacementMap in="SourceGraphic" in2="softMap" scale="34" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
+      <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-safe">
+        <div className="glass-pill-frame pointer-events-auto relative mx-auto mb-1 max-w-md overflow-hidden rounded-full">
+          <div className="liquid-effect absolute inset-0" aria-hidden="true" />
+          <div className="relative z-10 flex items-center justify-around gap-0.5 px-2 py-2">
+            {items.map((item) => (
+              <TabItem
+                key={item.path}
+                icon={item.icon}
+                label={item.label}
+                path={item.path}
+                active={location.pathname === item.path}
+                onSelect={() => {
+                  if (item.path === "/") setSelectedGateway(null);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </nav>
+    </>
   );
 }
