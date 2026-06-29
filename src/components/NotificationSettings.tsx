@@ -167,12 +167,39 @@ export function NotificationSettings() {
 
   const handleTestNotification = async () => {
     if (!userId) return;
-    if (Notification.permission === "granted") {
-      new Notification("PayHook - Teste", {
-        body: "✅ Notificação de teste enviada com sucesso!",
-        icon: "/favicon.ico",
-      });
+
+    if (!("Notification" in window)) {
+      toast({ title: "Sem suporte", description: "Este navegador não suporta notificações.", variant: "destructive" });
+      return;
     }
+
+    // Garante a permissão na hora (pede se ainda não foi decidido)
+    let perm = Notification.permission;
+    if (perm === "default") {
+      perm = await Notification.requestPermission();
+    }
+    if (perm !== "granted") {
+      toast({
+        title: "Notificações bloqueadas",
+        description: "Permita as notificações nas configurações do navegador e tente de novo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Mostra a notificação local — via service worker quando possível (melhor no mobile/PWA)
+    try {
+      const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+      if (reg) {
+        await reg.showNotification("PayHook - Teste", { body: "✅ Notificação de teste!", icon: "/favicon.ico" });
+      } else {
+        new Notification("PayHook - Teste", { body: "✅ Notificação de teste!", icon: "/favicon.ico" });
+      }
+    } catch {
+      new Notification("PayHook - Teste", { body: "✅ Notificação de teste!", icon: "/favicon.ico" });
+    }
+
+    // Push real pelo servidor (só se já estiver inscrito)
     if (isSubscribed) {
       await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push`, {
         method: "POST",
@@ -184,9 +211,15 @@ export function NotificationSettings() {
         body: JSON.stringify({ userId, title: "PayHook - Teste Push", body: "✅ Notificação push de teste enviada!", url: "/notifications" }),
       });
     }
+
     if (settings.sound_enabled) handleTestSound();
     if (settings.vibration_enabled && "vibrate" in navigator) navigator.vibrate([200, 100, 200]);
-    toast({ title: "Notificação de teste enviada!" });
+    toast({
+      title: "Notificação enviada!",
+      description: isSubscribed
+        ? undefined
+        : "Dica: ative as Notificações Push acima para receber mesmo com o app fechado.",
+    });
   };
 
   return (
