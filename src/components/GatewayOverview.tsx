@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence, type PanInfo } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   fetchPaymentStatsByGateway,
   deleteGatewayConfig,
@@ -37,7 +37,8 @@ const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigi
 
 const CARD_H = 184;
 const OVERLAP = 120;
-const SWIPE_THRESHOLD = 90;
+const SWIPE_THRESHOLD = 80;
+const MOVE_TOLERANCE = 12; // tolera tremor do dedo antes de cancelar o long-press
 const SPRING = { type: "spring", duration: 0.45, bounce: 0.2 } as const;
 
 type Stats = { paid: number; pending: number; failed: number; total: number; count: number };
@@ -49,13 +50,16 @@ export function GatewayOverview() {
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<string[]>([]);
   const [active, setActive] = useState<string | null>(null);
+  const [dragName, setDragName] = useState<string | null>(null);
+  const [dragX, setDragX] = useState(0);
+  const [leaving, setLeaving] = useState(false);
   const [colorOverride, setColorOverride] = useState<Record<string, string>>({});
   const [showAdd, setShowAdd] = useState(false);
   const [addName, setAddName] = useState("");
   const [addSecret, setAddSecret] = useState("");
   const { toast } = useToast();
 
-  const longRef = useRef({ fired: false, timer: 0 });
+  const gest = useRef({ startX: 0, startY: 0, moved: false, longFired: false, timer: 0 });
 
   useEffect(() => {
     fetchPaymentStatsByGateway().then((s) => {
@@ -121,31 +125,55 @@ export function GatewayOverview() {
     toast({ title: "Gateway adicionado", description: `${n} foi configurado.` });
   };
 
-  // ---------- gestos ----------
-  const startLong = (name: string) => {
-    longRef.current.fired = false;
-    clearTimeout(longRef.current.timer);
-    longRef.current.timer = window.setTimeout(() => {
-      longRef.current.fired = true;
+  // ---------- gestos manuais: tap / swipe / long-press ----------
+  const onDown = (e: React.PointerEvent, name: string) => {
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    gest.current.startX = e.clientX;
+    gest.current.startY = e.clientY;
+    gest.current.moved = false;
+    gest.current.longFired = false;
+    clearTimeout(gest.current.timer);
+    gest.current.timer = window.setTimeout(() => {
+      gest.current.longFired = true;
+      setDragName(null);
+      setDragX(0);
       setActive(name);
-    }, 450);
+    }, 420);
+    setDragName(name);
   };
-  const cancelLong = () => clearTimeout(longRef.current.timer);
 
-  const handleTap = (name: string) => {
-    cancelLong();
-    if (longRef.current.fired) {
-      longRef.current.fired = false;
+  const onMove = (e: React.PointerEvent, isFront: boolean) => {
+    if (dragName === null || gest.current.longFired) return;
+    const dx = e.clientX - gest.current.startX;
+    const dy = e.clientY - gest.current.startY;
+    if (!gest.current.moved && Math.hypot(dx, dy) > MOVE_TOLERANCE) {
+      gest.current.moved = true;
+      clearTimeout(gest.current.timer);
+    }
+    if (gest.current.moved && isFront && Math.abs(dx) > Math.abs(dy)) {
+      setDragX(dx);
+    }
+  };
+
+  const onUp = (name: string, isFront: boolean) => {
+    clearTimeout(gest.current.timer);
+    setDragName(null);
+    if (gest.current.longFired) {
+      setDragX(0);
       return;
     }
-    setSelectedGateway(name);
-  };
-
-  const handleDragEnd = (name: string, info: PanInfo) => {
-    cancelLong();
-    if (longRef.current.fired) return;
-    if (Math.abs(info.offset.x) > SWIPE_THRESHOLD) {
-      setOrder((prev) => [name, ...prev.filter((n) => n !== name)]);
+    if (gest.current.moved && isFront && Math.abs(dragX) > SWIPE_THRESHOLD) {
+      setLeaving(true);
+      setDragX(dragX > 0 ? 700 : -700);
+      window.setTimeout(() => {
+        setOrder((prev) => [name, ...prev.filter((n) => n !== name)]);
+        setDragX(0);
+        setLeaving(false);
+      }, 230);
+    } else if (!gest.current.moved) {
+      setSelectedGateway(name);
+    } else {
+      setDragX(0);
     }
   };
 
@@ -155,7 +183,7 @@ export function GatewayOverview() {
       <>
         <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute right-12 top-20 h-24 w-24 rounded-full bg-white/5" />
-        <div className="relative flex h-full flex-col justify-between p-5">
+        <div className="pointer-events-none relative flex h-full flex-col justify-between p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
@@ -219,29 +247,35 @@ export function GatewayOverview() {
             {order.map((name, i) => {
               const gw = getGw(name);
               const isFront = i === order.length - 1;
+              const isDrag = dragName === name && isFront;
               return (
-                <motion.button
+                <button
                   key={name}
-                  layout
-                  transition={SPRING}
-                  drag={isFront ? "x" : false}
-                  dragSnapToOrigin
-                  dragElastic={0.5}
-                  onPointerDown={() => startLong(name)}
-                  onDragStart={cancelLong}
-                  onDragEnd={(_e, info) => handleDragEnd(name, info)}
-                  onTap={() => handleTap(name)}
-                  className={`relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradOf(name, gw.color)}`}
+                  onPointerDown={(e) => onDown(e, name)}
+                  onPointerMove={(e) => onMove(e, isFront)}
+                  onPointerUp={() => onUp(name, isFront)}
+                  onPointerCancel={() => {
+                    clearTimeout(gest.current.timer);
+                    setDragName(null);
+                    setDragX(0);
+                  }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className={`relative block w-full select-none overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradOf(name, gw.color)}`}
                   style={{
                     height: CARD_H,
                     marginTop: i === 0 ? 0 : -OVERLAP,
                     zIndex: i + 1,
-                    opacity: active === name ? 0 : 1,
+                    transform: isFront && dragX ? `translateX(${dragX}px) rotate(${dragX * 0.02}deg)` : undefined,
+                    transition: isDrag && !leaving ? "none" : "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease",
+                    opacity: active === name ? 0 : isFront && leaving ? 0 : 1,
                     touchAction: "pan-y",
+                    WebkitUserSelect: "none",
+                    userSelect: "none",
+                    WebkitTouchCallout: "none",
                   }}
                 >
                   {cardInner(gw)}
-                </motion.button>
+                </button>
               );
             })}
           </div>
@@ -274,7 +308,7 @@ export function GatewayOverview() {
             onClick={() => setActive(null)}
           >
             <motion.div
-              className={`relative w-full max-w-sm overflow-hidden rounded-2xl bg-gradient-to-br text-white shadow-2xl ring-1 ring-white/20 ${gradOf(active, activeGw.color)}`}
+              className={`relative w-full max-w-sm select-none overflow-hidden rounded-2xl bg-gradient-to-br text-white shadow-2xl ring-1 ring-white/20 ${gradOf(active, activeGw.color)}`}
               style={{ height: CARD_H }}
               initial={{ scale: 0.82, opacity: 0, y: 14 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
