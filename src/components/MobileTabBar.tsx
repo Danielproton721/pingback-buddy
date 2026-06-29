@@ -69,6 +69,8 @@ export function MobileTabBar() {
       <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-safe">
         <div className="glass-pill-frame pointer-events-auto relative mx-auto mb-1 max-w-md overflow-hidden rounded-full">
           <div className="liquid-effect absolute inset-0" aria-hidden="true" />
+          {/* borda branca fina — fica ACIMA do efeito líquido para não ser coberta */}
+          <div className="pointer-events-none absolute inset-0 z-20 rounded-full ring-1 ring-inset ring-white/35" aria-hidden="true" />
           <div className="relative z-10 flex items-center justify-around gap-0.5 px-2 py-2">
             {items.map((item) => (
               <TabItem
