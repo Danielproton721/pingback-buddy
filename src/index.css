@@ -83,9 +83,14 @@
   * {
     @apply border-border;
   }
+  html {
+    /* Evita pull-to-refresh / swipe-to-navigate roubarem o gesto de arrastar o cartão */
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground font-sans;
     -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
   }
   /* Fundo vivo: dá cor para o vidro desfocar atrás. Fixo e atrás de tudo. */
   body::before {
