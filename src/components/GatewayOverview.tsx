@@ -1,12 +1,32 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { fetchPaymentStatsByGateway } from "@/lib/supabase-helpers";
 import { useGateway } from "@/contexts/GatewayContext";
-import { DollarSign, TrendingUp, ArrowRight, Layers } from "lucide-react";
+import { ArrowRight, Plus, Wallet } from "lucide-react";
 import { getGatewayIcon } from "@/components/GatewayIconPicker";
+
+// Gradientes dos cartões (estáveis por nome do gateway)
+const CARD_GRADIENTS = [
+  "from-violet-600 via-violet-700 to-indigo-800",
+  "from-cyan-500 via-sky-600 to-blue-700",
+  "from-emerald-500 via-teal-600 to-teal-800",
+  "from-rose-500 via-pink-600 to-fuchsia-700",
+  "from-amber-500 via-orange-600 to-red-600",
+  "from-slate-600 via-slate-700 to-slate-900",
+];
+
+const gradientFor = (name: string) => {
+  const hash = name.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  return CARD_GRADIENTS[hash % CARD_GRADIENTS.length];
+};
+
+const brl = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 export function GatewayOverview() {
   const { gateways, setSelectedGateway } = useGateway();
-  const [statsByGateway, setStatsByGateway] = useState<Record<string, { paid: number; pending: number; failed: number; total: number; count: number }>>({});
+  const [statsByGateway, setStatsByGateway] = useState<
+    Record<string, { paid: number; pending: number; failed: number; total: number; count: number }>
+  >({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,11 +36,7 @@ export function GatewayOverview() {
     });
   }, []);
 
-  // Merge gateway configs with stats (some gateways may have no payments yet)
-  const allGateways = new Set([
-    ...gateways.map((g) => g.name),
-    ...Object.keys(statsByGateway),
-  ]);
+  const allGateways = new Set([...gateways.map((g) => g.name), ...Object.keys(statsByGateway)]);
 
   const gatewayList = Array.from(allGateways).map((name) => {
     const config = gateways.find((g) => g.name === name);
@@ -29,15 +45,18 @@ export function GatewayOverview() {
       displayName: config?.display_name || name,
       icon: config?.icon || "credit-card",
       stats: statsByGateway[name] || { paid: 0, pending: 0, failed: 0, total: 0, count: 0 },
-      configured: !!config,
     };
   });
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="glass-card rounded-xl p-5 animate-pulse h-40" />
+      <div className="mx-auto w-full max-w-lg space-y-3">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-[184px] animate-pulse rounded-2xl bg-secondary/40"
+            style={{ marginTop: i === 0 ? 0 : -120 }}
+          />
         ))}
       </div>
     );
@@ -45,62 +64,82 @@ export function GatewayOverview() {
 
   if (gatewayList.length === 0) {
     return (
-      <div className="glass-card rounded-xl p-8 text-center">
-        <Layers className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-        <p className="text-sm text-muted-foreground">
-          Nenhum gateway configurado. Vá em Configurações para adicionar um gateway.
-        </p>
-      </div>
+      <Link
+        to="/settings"
+        className="tap flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-10 text-center"
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+          <Wallet className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-medium">Sua carteira está vazia</p>
+          <p className="mt-1 text-xs text-muted-foreground">Toque para adicionar seu primeiro gateway</p>
+        </div>
+      </Link>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {gatewayList.map((gw) => (
-        <button
-          key={gw.name}
-          onClick={() => setSelectedGateway(gw.name)}
-          className="glass-card rounded-xl p-5 text-left transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 group"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              {(() => {
-                const Icon = getGatewayIcon(gw.icon);
-                return (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                    <Icon className="h-4 w-4 text-primary" />
+    <div className="mx-auto w-full max-w-lg">
+      <div className="pb-1">
+        {gatewayList.map((gw, i) => {
+          const Icon = getGatewayIcon(gw.icon);
+          return (
+            <button
+              key={gw.name}
+              onClick={() => setSelectedGateway(gw.name)}
+              className={`tap group relative block w-full overflow-hidden rounded-2xl bg-gradient-to-br text-left text-white shadow-[0_10px_28px_hsl(225_50%_2%/0.5)] ring-1 ring-white/15 ${gradientFor(
+                gw.name
+              )}`}
+              style={{ height: 184, marginTop: i === 0 ? 0 : -120, zIndex: i + 1 }}
+            >
+              {/* círculos decorativos (estilo cartão) */}
+              <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-white/10" />
+              <div className="pointer-events-none absolute right-12 top-20 h-24 w-24 rounded-full bg-white/5" />
+
+              <div className="relative flex h-full flex-col justify-between p-5">
+                {/* faixa visível na pilha: ícone + nome + total */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold leading-tight">{gw.displayName}</p>
+                      <p className="text-[11px] text-white/70">{gw.stats.count} transações</p>
+                    </div>
                   </div>
-                );
-              })()}
-              <h3 className="font-semibold text-sm">{gw.displayName}</h3>
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
+                  <p className="shrink-0 text-right font-mono text-lg font-bold">{brl(gw.stats.total)}</p>
+                </div>
 
-          <p className="text-2xl font-bold font-mono mb-3">
-            R$ {gw.stats.total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-          </p>
+                {/* base (aparece no cartão de cima / ao tocar): resumo */}
+                <div className="flex items-end justify-between">
+                  <div className="flex gap-5 text-[11px]">
+                    <div>
+                      <p className="text-white/60">Pagos</p>
+                      <p className="font-mono font-medium">{brl(gw.stats.paid)}</p>
+                    </div>
+                    <div>
+                      <p className="text-white/60">Pendentes</p>
+                      <p className="font-mono font-medium">{brl(gw.stats.pending)}</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-white/70 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div>
-              <p className="text-muted-foreground">Pagos</p>
-              <p className="font-mono font-medium text-success">
-                R$ {gw.stats.paid.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Pendentes</p>
-              <p className="font-mono font-medium text-warning">
-                R$ {gw.stats.pending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Transações</p>
-              <p className="font-mono font-medium">{gw.stats.count}</p>
-            </div>
-          </div>
-        </button>
-      ))}
+      {/* adicionar novo cartão */}
+      <Link
+        to="/settings"
+        className="tap mt-4 flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground"
+      >
+        <Plus className="h-4 w-4" />
+        Adicionar gateway
+      </Link>
     </div>
   );
 }
