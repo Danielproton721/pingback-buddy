@@ -26,3 +26,6 @@ dist-ssr
 
 # Pasta de download dos icones Lordicon (os usados ja estao em src/assets/lottie)
 animated icons black/
+
+# Arquivos temporarios da CLI do Supabase
+supabase/.temp/
