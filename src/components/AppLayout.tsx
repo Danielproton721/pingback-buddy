@@ -76,7 +76,7 @@ export function AppLayout() {
             <LogOut className="h-5 w-5" />
           </button>
         </header>
-        <main className="px-4 pb-28 pt-4">
+        <main className="overflow-x-clip px-4 pb-28 pt-4">
           <div className="mx-auto max-w-2xl">
             <AnimatedOutlet />
           </div>
@@ -89,7 +89,7 @@ export function AppLayout() {
   return (
     <div className="min-h-screen">
       <AppSidebar />
-      <main className="pl-64">
+      <main className="overflow-x-clip pl-64">
         <div className="mx-auto max-w-6xl p-6">
           <AnimatedOutlet />
         </div>
