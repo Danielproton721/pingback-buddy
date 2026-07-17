@@ -25,6 +25,19 @@ function extractField(payload: any, ...paths: string[]): any {
   return null;
 }
 
+// Converte o valor bruto do gateway para reais.
+// Gateways de pagamento enviam o valor na menor unidade (centavos) como número
+// INTEIRO — ex.: 500 = R$ 5,00. Só quando vem com casa decimal ("5.00", "5,50")
+// é que o valor já está em reais. Nunca use a magnitude ( >1000 ) pra decidir:
+// isso fazia toda compra abaixo de ~R$ 10 virar 100x maior.
+function parseAmount(raw: any): number {
+  if (raw === null || raw === undefined || raw === "") return 0;
+  const n = Number(String(raw).replace(",", "."));
+  if (!isFinite(n) || n <= 0) return 0;
+  const hasDecimal = /[.,]/.test(String(raw));
+  return hasDecimal ? n : n / 100;
+}
+
 function parseEventTime(payload: any): string | null {
   const raw = extractField(
     payload,
@@ -146,7 +159,7 @@ serve(async (req) => {
     "transaction.amount", "transaction.paid_amount",
     "data.object.amount_total", "data.paidAmount"
   );
-  const amount = rawAmount ? (Number(rawAmount) > 1000 ? Number(rawAmount) / 100 : Number(rawAmount)) : 0;
+  const amount = parseAmount(rawAmount);
 
   const customerName = extractField(
     payload, "customer_name", "data.customer.name", "data.object.customer_name",
