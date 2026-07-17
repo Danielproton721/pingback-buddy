@@ -174,7 +174,8 @@ serve(async (req) => {
   );
 
   const paymentMethod = extractField(
-    payload, "payment_method", "data.paymentMethod", "data.object.payment_method_types[0]",
+    payload, "payment_method", "data.paymentMethod", "data.method",
+    "data.object.payment_method_types[0]",
     "method", "payment_type", "data.object.payment_method",
     "transaction.payment_method"
   );
@@ -303,18 +304,23 @@ serve(async (req) => {
     };
     const notifTitle = statusLabels[status] || "Atualização de pagamento";
 
-    // Use custom message template if available
-    const templateMsg = status === "paid" ? us?.paid_message : status === "pending" ? us?.pending_message : null;
-    const formatTemplate = (tpl: string) =>
-      tpl
-        .replace(/\{customer\}/g, customerName || "Cliente")
-        .replace(/\{amount\}/g, Number(amount).toFixed(2))
-        .replace(/\{product\}/g, productName || "N/A")
-        .replace(/\{method\}/g, paymentMethod || "N/A");
+    // Rótulos formatados (pt-BR) para a notificação
+    const gatewayLabel = matchedConfig?.name || gatewayName;
+    const fmtAmount = Number(amount).toFixed(2).replace(".", ",");
+    const fmtMethod = paymentMethod ? String(paymentMethod).toUpperCase() : null;
 
-    const notifMessage = templateMsg
-      ? formatTemplate(templateMsg)
-      : `${customerName || "Cliente"} - R$ ${Number(amount).toFixed(2)}${productName ? ` - ${productName}` : ""} via ${paymentMethod || "N/A"}`;
+    // A preferência do usuário guarda só a POSIÇÃO do valor (início/fim). A mensagem
+    // é montada aqui dinamicamente com os dados que o gateway REALMENTE enviou —
+    // cliente, produto, método e gateway — sem "N/A" para o que veio vazio
+    // (ex.: Pagou.Ai não manda cliente nem produto).
+    const tpl = status === "paid" ? us?.paid_message : status === "pending" ? us?.pending_message : null;
+    const valueAtStart = typeof tpl === "string" && tpl.trim().startsWith("R$ {amount}");
+
+    const details = [customerName, productName, fmtMethod, gatewayLabel].filter(Boolean);
+    const detailStr = details.join(" • ");
+    const notifMessage = valueAtStart
+      ? `R$ ${fmtAmount}${detailStr ? " — " + detailStr : ""}`
+      : `${detailStr ? detailStr + " — " : ""}R$ ${fmtAmount}`;
 
     // Liga/desliga a notificação por status (Pago / Pendente). Outros status sempre notificam.
     const notifyEnabled =

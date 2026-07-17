@@ -15,8 +15,8 @@ const detectPos = (msg?: string | null): ValuePos =>
 
 const previewText = (pos: ValuePos) =>
   pos === "start"
-    ? "R$ 49,90 — João Silva • Curso de Marketing"
-    : "João Silva • Curso de Marketing — R$ 49,90";
+    ? "R$ 49,90 — João Silva • Curso de Marketing • PIX • Pagou.Ai"
+    : "João Silva • Curso de Marketing • PIX • Pagou.Ai — R$ 49,90";
 
 const DEFAULT_PAID_TITLE = "Pagamento confirmado";
 const DEFAULT_PENDING_TITLE = "Novo pagamento";
@@ -127,6 +127,10 @@ export function NotificationTemplates() {
           <p className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Prévia</p>
           <p className="text-sm">{previewText(valuePos)}</p>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Cliente, produto e método aparecem quando o gateway os envia — alguns
+          gateways mandam menos dados que outros.
+        </p>
       </div>
 
       {/* Pago */}
