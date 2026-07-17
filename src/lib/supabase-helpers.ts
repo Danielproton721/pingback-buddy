@@ -106,12 +106,26 @@ export async function createGatewayConfig(data: { name: string; secret_key: stri
 }
 
 export async function deleteGatewayConfig(id: string) {
-  // First get the gateway name to delete related data
+  // Pega o nome para apagar os dados vinculados a este gateway.
   const { data: config } = await supabase.from('gateway_configs').select('name').eq('id', id).single();
   if (config) {
-    // Delete related payments, webhook_logs and notifications for this gateway
-    await supabase.from('payments').delete().eq('gateway', config.name);
-    await supabase.from('webhook_logs').delete().eq('gateway', config.name);
+    // Casa o nome ignorando caixa e espaços — os webhooks podem ter gravado o
+    // gateway com capitalização diferente (ex.: "MEDUSA PAY" vs "Medusa Pay"),
+    // e um .eq() exato deixava esses registros orfãos, que "voltavam" ao recriar.
+    const target = config.name.trim().toLowerCase();
+    const matches = (g: string | null) => (g || '').trim().toLowerCase() === target;
+
+    const { data: pays } = await supabase.from('payments').select('id, gateway');
+    const payIds = (pays || []).filter(p => matches(p.gateway)).map(p => p.id);
+    if (payIds.length) {
+      // Apaga as notificações vinculadas antes dos pagamentos.
+      await supabase.from('notifications').delete().in('payment_id', payIds);
+      await supabase.from('payments').delete().in('id', payIds);
+    }
+
+    const { data: logs } = await supabase.from('webhook_logs').select('id, gateway');
+    const logIds = (logs || []).filter(l => matches(l.gateway)).map(l => l.id);
+    if (logIds.length) await supabase.from('webhook_logs').delete().in('id', logIds);
   }
   return supabase.from('gateway_configs').delete().eq('id', id);
 }
