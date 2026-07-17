@@ -8,7 +8,7 @@ import {
 } from "@/lib/supabase-helpers";
 import { supabase } from "@/integrations/supabase/client";
 import { useGateway } from "@/contexts/GatewayContext";
-import { ArrowRight, Plus, Wallet, Trash2, X } from "lucide-react";
+import { ArrowRight, Plus, Wallet, Trash2, X, Copy, Check, ChevronLeft } from "lucide-react";
 import { getGatewayIcon } from "@/components/GatewayIconPicker";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,6 +57,9 @@ export function GatewayOverview() {
   const [showAdd, setShowAdd] = useState(false);
   const [addName, setAddName] = useState("");
   const [addSecret, setAddSecret] = useState("");
+  const [step, setStep] = useState(1);
+  const [dir, setDir] = useState(1);
+  const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   const gest = useRef({ startX: 0, startY: 0, moved: false, longFired: false, timer: 0 });
@@ -112,17 +115,36 @@ export function GatewayOverview() {
     }
   };
 
+  const openAdd = () => {
+    setAddName("");
+    setAddSecret("");
+    setStep(1);
+    setDir(1);
+    setShowAdd(true);
+  };
+
+  const goStep = (s: number) => {
+    setDir(s > step ? 1 : -1);
+    setStep(s);
+  };
+
   const handleAdd = async () => {
     const n = addName.trim();
     if (!n || !addSecret.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await createGatewayConfig({ name: n, secret_key: addSecret.trim(), user_id: user.id });
-    setAddName("");
-    setAddSecret("");
-    setShowAdd(false);
     await refreshGateways();
+    setDir(1);
+    setStep(3);
     toast({ title: "Gateway adicionado", description: `${n} foi configurado.` });
+  };
+
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL || ""}/functions/v1/webhook-payment?gateway=${encodeURIComponent(addName.trim())}`;
+  const copyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   };
 
   // ---------- gestos manuais: tap / swipe / long-press ----------
@@ -230,7 +252,7 @@ export function GatewayOverview() {
     <div className="mx-auto w-full max-w-lg">
       {order.length === 0 ? (
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={openAdd}
           className="tap flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-10 text-center"
         >
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
@@ -287,7 +309,7 @@ export function GatewayOverview() {
           )}
 
           <button
-            onClick={() => setShowAdd(true)}
+            onClick={openAdd}
             className="tap mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground"
           >
             <Plus className="h-4 w-4" />
@@ -377,33 +399,120 @@ export function GatewayOverview() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold">Adicionar gateway</h3>
+                <h3 className="text-base font-semibold tracking-tight">
+                  {step === 3 ? "Tudo pronto!" : "Adicionar gateway"}
+                </h3>
                 <button onClick={() => setShowAdd(false)} className="tap rounded-lg p-1 text-muted-foreground hover:text-foreground">
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <div className="space-y-3">
-                <input
-                  value={addName}
-                  onChange={(e) => setAddName(e.target.value)}
-                  placeholder="Nome do gateway (ex: Stripe)"
-                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                />
-                <input
-                  type="password"
-                  value={addSecret}
-                  onChange={(e) => setAddSecret(e.target.value)}
-                  placeholder="Secret key"
-                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                />
-                <button
-                  onClick={handleAdd}
-                  disabled={!addName.trim() || !addSecret.trim()}
-                  className="tap flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                >
-                  <Plus className="h-4 w-4" />
-                  Adicionar
-                </button>
+
+              {/* progresso */}
+              <div className="mb-5 flex gap-1.5">
+                {[1, 2, 3].map((s) => (
+                  <div key={s} className={`h-1 flex-1 rounded-full transition-colors ${s <= step ? "bg-primary" : "bg-secondary"}`} />
+                ))}
+              </div>
+
+              {/* etapa atual */}
+              <div className="relative overflow-hidden">
+                <AnimatePresence mode="wait" initial={false} custom={dir}>
+                  <motion.div
+                    key={step}
+                    custom={dir}
+                    initial={{ opacity: 0, x: dir * 34 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: dir * -34 }}
+                    transition={{ type: "spring", duration: 0.32, bounce: 0 }}
+                  >
+                    {step === 1 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Nome do gateway</label>
+                        <input
+                          autoFocus
+                          value={addName}
+                          onChange={(e) => setAddName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && addName.trim()) goStep(2); }}
+                          placeholder="Ex: Stripe"
+                          className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <p className="text-xs text-muted-foreground">Um nome pra identificar esse gateway na sua carteira.</p>
+                      </div>
+                    )}
+                    {step === 2 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Chave secreta</label>
+                        <input
+                          autoFocus
+                          type="password"
+                          value={addSecret}
+                          onChange={(e) => setAddSecret(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && addSecret.trim()) handleAdd(); }}
+                          placeholder="Secret key"
+                          className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+                        />
+                        <p className="text-xs text-muted-foreground">A chave que valida os webhooks recebidos desse gateway.</p>
+                      </div>
+                    )}
+                    {step === 3 && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-success/15 text-success">
+                            <Check className="h-4 w-4" />
+                          </span>
+                          <span className="font-medium">{addName.trim()} criado!</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Cole esta URL no painel de webhooks do seu gateway para começar a receber os pagamentos:
+                        </p>
+                        <div className="flex items-center gap-2 rounded-xl bg-secondary/60 p-2">
+                          <code className="min-w-0 flex-1 break-all font-mono text-[10px] text-muted-foreground">{webhookUrl}</code>
+                          <button onClick={copyWebhook} className="tap shrink-0 rounded-lg bg-primary p-2 text-primary-foreground">
+                            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              {/* navegação */}
+              <div className="mt-5 flex gap-2">
+                {step === 1 && (
+                  <button
+                    onClick={() => goStep(2)}
+                    disabled={!addName.trim()}
+                    className="tap flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    Continuar <ArrowRight className="h-4 w-4" />
+                  </button>
+                )}
+                {step === 2 && (
+                  <>
+                    <button
+                      onClick={() => goStep(1)}
+                      className="tap flex h-11 items-center justify-center gap-1 rounded-xl border border-input px-4 text-sm font-medium text-muted-foreground"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Voltar
+                    </button>
+                    <button
+                      onClick={handleAdd}
+                      disabled={!addSecret.trim()}
+                      className="tap flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      <Plus className="h-4 w-4" /> Adicionar
+                    </button>
+                  </>
+                )}
+                {step === 3 && (
+                  <button
+                    onClick={() => setShowAdd(false)}
+                    className="tap flex h-11 w-full items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    Concluir
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>
